@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Fire Ball</title>
+	<link rel="stylesheet" href="css/themes/default/jquery.mobile-1.4.5.min.css">
+	<link rel="stylesheet" href="_assets/css/jqm-demos.css">
+	<link rel="shortcut icon" href="fireball.ico">
+	<script src="js/jquery.js"></script>
+	<script src="_assets/js/index.js"></script>
+	<script src="js/jquery.mobile-1.4.5.min.js"></script>
+	<script src="js/Chart.min.js"></script>
+	
+	 <style id="textinput-controlgroup">
+			.controlgroup-textinput{
+				padding-top:.22em;
+				padding-bottom:.22em;
+			}
+			table, th, td {
+			    text-align: center;
+			    font: normal 12px courier !important;
+			    
+			}
+			tr:nth-child(even) {background-color: #f2f2f2}
+			.blue{
+				color: blue;
+				font: normal 14px courier !important;
+			}
+			.timeTable{
+				font: normal 10px courier !important;
+			}
+			[data-role=page]{height: 100% !important; position:relative !important;}
+			[data-role=footer]{bottom:0; position:absolute !important; top: auto !important; width:100%;}  
+			
+	    </style>
+
+	<script >
+	$( document ).ready(function() {
+		var refreshTime = 0; 
+		var myVar;
+		$(':mobile-pagecontainer').pagecontainer('change', '#one');
+		function myTimer() {
+			var iTime = new Date();
+			var diff = iTime.getTime()-refreshTime;
+	/*  	console.log("timeElapsed " + refreshTime + ", " + iTime.getTime()); */
+			if(diff>30000){
+				console.log("expired");
+				$(':mobile-pagecontainer').pagecontainer('change', '#one');
+				clearInterval(myVar);
+				$("#stat").text("Disconnected");
+				$("#connect").removeAttr("disabled"); 				
+			}else{
+				$("#stat").text("Connected!");
+			}
+		}
+
+		var totalLastVal="zero";
+    	
+		$("#passTxt").val("");
+	    $("#connect").click(function(){
+	    	
+	    	$("#connect").attr("disabled", "disabled");
+	    	$("#stat").text("connecting ...");
+	    	myVar = setInterval(myTimer, 20000);
+	        var meftih = $("#passTxt").val();
+
+	        var host = document.location.host;
+	        var pathname = document.location.pathname;
+	    	var ws = new WebSocket("ws://" +host  + pathname + "update/" + meftih);	    		
+	    	    ws.onmessage = function(event) {
+	    	    
+	    	    var log = document.getElementById("log");
+	    	        console.log(event.data);
+	    	        var message = JSON.parse(event.data);      
+	    	        if(message.content == "Connected!"){
+						$("#stat").text("Connected!");
+						$(':mobile-pagecontainer').pagecontainer('change', '#two');
+	    	    	}else if(message.content.indexOf("RealizedPnL")>-1){
+	    	        	$("#realized").text(message.content);
+	    	        }else if(message.content.indexOf("UnrealizedPnL")>-1){
+	    	        	$("#unrealized").text(message.content);
+	    	        }else if(message.content.indexOf("lastUpdatedTime")>-1){
+	    	        	var date = new Date(Number(message.content.split(":")[1].trim()));
+	    	        	$("#update").text("Updated on " + date.toString());
+	    	        }else if(message.content.indexOf("RefreshedAt")>-1){
+	    	        	var date = new Date(Number(message.content.split(":")[1].trim()));
+	    	        	$("#refresh").text("Refreshed at " + date.toString());
+	    	        	refreshTime = date.getTime();
+	    	        }else if(message.content.indexOf("Ticker")>-1){
+	    	        	 var msg = message.content;
+	    	        	 var group = message.content.split(":");
+	    	        	 var ticker = group[1].trim();
+	    	        	 var position= group[3].trim();
+	    	        	 var realized= group[5].trim();
+	    	        	 var unrealized= group[7].trim();
+	    	     	  	 $("#" + ticker).remove(); 
+	    	     	  	 
+	    	        	 var row = "<tr id='" + ticker +  "'><td>" + ticker + "</td><td>" + position +"</td><td>" + realized+ "</td><td>" + unrealized +"</td></tr>";
+	    	        	 $("#tablePosition").append(row);
+	    	        }else if(message.content.indexOf("HistoricalTotalPnL")>-1){
+    					var dataVal = message.content.split(":")[2].trim();
+    					if(totalLastVal != dataVal){
+    						totalLastVal = dataVal;
+		    	    		var label = JSON.parse(message.content.split(":")[1].trim()); 
+		    	    		var data = JSON.parse(dataVal);
+		    	    		draw(label,data);
+	    	        	}
+	    	        }
+	    	    };
+	    });
+	    
+	    function draw(label,data){
+	    	 $("#myChart").remove();
+	    	 $("#secondMain").append('<canvas id="myChart" style="position: relative; height:50vh; width:80vw"></canvas>');
+			 var ctx = $("#myChart");
+			 var myChart = new Chart(ctx, {
+				    type: 'line',
+				    data: {
+				        labels: label,
+				        datasets: [{
+				            label: '# Total PnL',
+				            data: data,
+				            borderWidth: 2,
+				            borderColor: "#3e95cd",
+				            fill: false
+				        }]
+				    },				    
+				    options: {
+				        scales: {
+				            yAxes: [{
+				                ticks: {
+				                    beginAtZero:false
+				                }
+				            }],
+				            xAxes: [{
+				                ticks: {
+				                    autoSkip: false,
+				                    maxRotation: 90,
+				                    minRotation: 90
+				                }
+				            }]
+				        }
+				    }
+				});
+	    }
+	    
+	});
+	</script>
+</head>
+
+<body>
+
+<!-- Start of login page: #one -->
+
+<div data-role="page" id="one" data-theme="a">
+
+	<div data-role="header">
+		<h1>FireBall Dashboard</h1>
+	</div><!-- /header -->
+
+	<div role="main" class="ui-content">
+		<br><br><br><br>
+		 <input type="password" class="center-input" placeholder="Password" id="passTxt">
+		 <button class="center-input" id="connect" >Submit</button>
+		 <label class="blue"  id="stat"></label>
+	</div>
+
+
+</div><!-- /page two -->
+
+
+<!-- Start of first page: #two -->
+<div data-role="page" id="two">
+
+	<div data-role="header">
+		<h1>FireBall Dashboard</h1>
+	</div><!-- /header -->
+
+	<div role="main" class="ui-content">
+<!-- 		<form>
+		     <input type="text" name="text-6" id="text-6" value="" placeholder="Password">
+		     <button class="ui-btn ui-btn-inline">Button</button>
+		</form> -->
+		<table width="100%">
+		<tr>
+		<td>
+			<label class="blue"  id="stat"></label>
+		</td></tr>
+		</table>
+		
+		<table width="100%" >
+		<tr><td>
+			<label class="timeTable" id="refresh"></label>
+		</td>
+		<td>
+			<label class="timeTable" id="update"></label>
+		</td></tr>
+		</table>
+		
+		<hr>
+		
+		<table width="100%" id="tablePosition">
+			<tr><th>Ticker</th><th>Position</th><th>Realized</th><th>Unrealized</th></tr>
+		</table>
+		<hr>
+		<table width="100%">
+		<tr><td><label class="blue" id="realized"></label></td>
+		<td><label class="blue"  id="unrealized"></label></td></tr>
+		</table>
+	</div><!-- /content -->
+    
+	<div data-role="footer" data-theme="a">
+	  <h4><a href="#three" style="text-decoration:none" data-direction="forward" class="ui-btn-b ui-corner-all">Historical PnL</a></h4> 	
+	</div><!-- /footer -->
+</div><!-- /page one -->
+
+<!-- Start of second page: #three -->
+<div data-role="page" id="three" data-theme="a">
+
+	<div data-role="header">
+		<h1>FireBall Dashboard</h1>
+	</div><!-- /header -->
+
+	<div role="main" id ="secondMain" class="ui-content">
+		
+
+	</div><!-- /content -->
+
+	<div data-role="footer">
+		<h4><a href="#two" style="text-decoration:none" data-direction="reverse" class="ui-btn-b ui-corner-all">Main Page</a></h4>
+	</div><!-- /footer -->
+</div><!-- /page two -->
+
+
+<!-- Start of third page: #popup -->
+<div data-role="page" id="popup">
+
+	<div data-role="header" data-theme="b">
+		<h1>Dialog</h1>
+	</div><!-- /header -->
+
+	<div role="main" class="ui-content">
+		<h2>Popup</h2>
+		<p>I have an id of "popup" on my page container and only look like a dialog because the link to me had a <code>data-rel="dialog"</code> attribute which gives me this inset look and a <code>data-transition="pop"</code> attribute to change the transition to pop. Without this, I'd be styled as a normal page.</p>
+		<p><a href="#one" data-rel="back" class="ui-btn ui-shadow ui-corner-all ui-btn-inline ui-icon-back ui-btn-icon-left">Back to page "one"</a></p>
+	</div><!-- /content -->
+
+	<div data-role="footer">
+		<h4>Fire Ball</h4>
+	</div><!-- /footer -->
+</div><!-- /page popup -->
+
+</body>
+</html>
